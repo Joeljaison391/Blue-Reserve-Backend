@@ -1,0 +1,7 @@
+# requirements.txt
+fastapi
+uvicorn
+pydantic
+python-jose
+passlib[bcrypt]
+psycopg2-binary
