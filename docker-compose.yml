@@ -42,5 +42,16 @@ services:
     depends_on:
       - db
 
+  health_service:
+    build:
+      context: ./services/health_service
+    container_name: health_service
+    ports:
+      - "8005:8005"
+    depends_on:
+      - auth_service
+      - user_management_service
+
+
 volumes:
   db_data:
