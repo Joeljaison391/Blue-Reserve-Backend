@@ -1,15 +1,12 @@
-# Use a lightweight Python image
-FROM python:3.9-slim
+FROM python:3.9
 
-# Set the working directory
 WORKDIR /app
 
-# Copy dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY initialize_seats.py /app/
+COPY initialize_seats.sh /app/
+RUN chmod +x /app/initialize_seats.sh
 
-# Copy the initialization script
-COPY initialize_seats.py .
+RUN pip install psycopg2
 
-# Run the script on container startup
-CMD ["python", "initialize_seats.py"]
+CMD ["/bin/sh", "/app/initialize_seats.sh"]
+

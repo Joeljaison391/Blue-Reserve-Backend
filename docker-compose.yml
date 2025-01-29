@@ -15,21 +15,14 @@ services:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - blu_network
+    healthcheck:  # ✅ Add health check
+      test: ["CMD-SHELL", "pg_isready -U postgres -d blu_reserve"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-  db_init:
-    build:
-      context: ./scripts
-    container_name: db_initializer
-    depends_on:
-      - db
-    environment:
-      DB_HOST: db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: blu_reserve
-    networks:
-      - blu_network
-    restart: "no"  # Ensure it runs once and stops
+
+
 
   auth_service:
     build:
@@ -75,19 +68,70 @@ services:
     networks:
       - blu_network
 
-  gateway:
-    image: nginx:latest
-    container_name: api_gateway
-    volumes:
-      - ./gateway/nginx.conf:/etc/nginx/nginx.conf
+  booking_service:
+    build:
+      context: ./services/booking_service
+    container_name: booking_service
+    environment:
+      DB_HOST: db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: blu_reserve
     ports:
-      - "8080:80"
+      - "8003:8003"
     depends_on:
+      - db
       - auth_service
       - user_management_service
-      - health_service
+
+  db_init:
+    build:
+      context: ./scripts
+    container_name: db_initializer
+    depends_on:
+      db:
+        condition: service_healthy  # Ensure DB is healthy before running
+    environment:
+      DB_HOST: db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: blu_reserve
     networks:
       - blu_network
+    restart: "no"  # Run once and exit
+
+
+  seat_service:
+    build:
+      context: ./services/seat_service
+    container_name: seat_service
+    environment:
+      DB_HOST: db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: blu_reserve
+    ports:
+      - "8004:8004"
+    depends_on:
+      - db
+      - auth_service
+      - user_management_service
+    networks:
+      - blu_network
+
+#  gateway:
+#    image: nginx:latest
+#    container_name: api_gateway
+#    volumes:
+#      - ./gateway/nginx.conf:/etc/nginx/nginx.conf
+#    ports:
+#      - "8080:80"
+#    depends_on:
+#      - auth_service
+#      - user_management_service
+#      - health_service
+#    networks:
+#      - blu_network
 
 volumes:
   db_data:

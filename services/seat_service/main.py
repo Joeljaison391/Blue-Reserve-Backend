@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 @app.get("/seats")
 def get_seats(
-    start_time: str = Query(..., description="Start time in YYYY-MM-DD HH:MM format"),
-    end_time: str = Query(..., description="End time in YYYY-MM-DD HH:MM format"),
-    filter: str = Query("available", description="Filter: 'available' for free seats, 'all' for all seats"),
-    current_user: dict = Depends(get_current_user)  # Authenticate user
+        start_time: str = Query(..., description="Start time in YYYY-MM-DD HH:MM format"),
+        end_time: str = Query(..., description="End time in YYYY-MM-DD HH:MM format"),
+        filter: str = Query("available", description="Filter: 'available' for free seats, 'all' for all seats"),
+        current_user: dict = Depends(get_current_user)  # Authenticate user
 ):
     """
     Fetch seats based on the given time range.
@@ -42,21 +42,31 @@ def get_seats(
         if filter.lower() == "available":
             # Fetch only available seats during the given time range
             query = """
-                SELECT id, table_id, seat_number, location, status
-                FROM seats
-                WHERE id NOT IN (
-                    SELECT seat_id FROM reservations
-                    WHERE (start_time < %s AND end_time > %s)
+                SELECT s.id, s.seat_number
+                FROM seats s
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM reservations r
+                    WHERE r.seat_id = s.id
+                    AND r.start_time < %s AND r.end_time > %s
                 )
             """
             cur.execute(query, (end_dt, start_dt))
 
         elif filter.lower() == "all":
-            # Fetch all seats, regardless of reservation status
+            # Fetch all seats, including reserved ones
             query = """
-                SELECT id, table_id, seat_number, location, status FROM seats
+                SELECT s.id, s.seat_number,
+                CASE 
+                    WHEN EXISTS (
+                        SELECT 1 FROM reservations r
+                        WHERE r.seat_id = s.id
+                        AND r.start_time < %s AND r.end_time > %s
+                    ) THEN 'RESERVED'
+                    ELSE 'AVAILABLE'
+                END AS status
+                FROM seats s
             """
-            cur.execute(query)
+            cur.execute(query, (end_dt, start_dt))
 
         else:
             raise HTTPException(status_code=400, detail="Invalid filter value. Use 'available' or 'all'.")
@@ -67,7 +77,7 @@ def get_seats(
         conn.close()
 
     return [
-        {"id": seat[0], "table_id": seat[1], "seat_number": seat[2], "location": seat[3], "status": seat[4]}
+        {"id": seat[0], "seat_number": seat[1], "status": seat[2] if len(seat) > 2 else "AVAILABLE"}
         for seat in seats
     ]
 
@@ -85,8 +95,7 @@ def get_seat_details(seat_id: int, current_user: dict = Depends(get_current_user
     try:
         # Fetch seat details
         cur.execute("""
-            SELECT id, table_id, seat_number, location, status
-            FROM seats WHERE id = %s
+            SELECT id, seat_number FROM seats WHERE id = %s
         """, (seat_id,))
 
         seat = cur.fetchone()
@@ -100,16 +109,24 @@ def get_seat_details(seat_id: int, current_user: dict = Depends(get_current_user
 
         reservations = cur.fetchall()
 
+        # Determine if seat is currently reserved
+        current_time = datetime.now()
+        cur.execute("""
+            SELECT COUNT(*) FROM reservations
+            WHERE seat_id = %s AND start_time <= %s AND end_time >= %s
+        """, (seat_id, current_time, current_time))
+
+        is_reserved = cur.fetchone()[0] > 0
+        seat_status = "RESERVED" if is_reserved else "AVAILABLE"
+
     finally:
         cur.close()
         conn.close()
 
     return {
         "seat_id": seat[0],
-        "table_id": seat[1],
-        "seat_number": seat[2],
-        "location": seat[3],
-        "status": seat[4],
+        "seat_number": seat[1],
+        "status": seat_status,
         "reservations": [
             {"start_time": res[0], "end_time": res[1], "status": res[2]}
             for res in reservations

@@ -24,9 +24,8 @@ CREATE TABLE employees (
 CREATE TABLE seats (
     id BIGSERIAL PRIMARY KEY, 
     seat_number INT NOT NULL CHECK (seat_number BETWEEN 1 AND 50),
-    status VARCHAR(50) CHECK (status IN ('AVAILABLE', 'RESERVED', 'RELEASED')) DEFAULT 'AVAILABLE',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);git 
+);
 
 -- Reservations Table
 CREATE TABLE reservations (
