@@ -1,30 +1,23 @@
 -- Employees Table
 CREATE TABLE employees (
-    id BIGSERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     username VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    bluDollar_balance DECIMAL(10, 2) DEFAULT 0,
+    bluDollar_used DECIMAL(10, 2) DEFAULT 0,
+    manager_id VARCHAR(255) NOT NULL
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    FOREIGN KEY (manager_id) REFERENCES manager(id)
 );
 
 -- Managers Table
 CREATE TABLE managers (
-    id BIGSERIAL PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     username VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     bluDollar_balance DECIMAL(10, 2) DEFAULT 0, -- BluDollar balance for the manager's team
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Teams Table
-CREATE TABLE teams (
-    id BIGSERIAL PRIMARY KEY,
-    manager_id BIGINT NOT NULL REFERENCES managers(id) ON DELETE CASCADE,
-    employee_id BIGINT NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(manager_id, employee_id)
 );
 
 -- Seats Table

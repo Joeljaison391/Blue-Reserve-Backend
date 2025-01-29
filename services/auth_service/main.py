@@ -43,10 +43,13 @@ def register_user(user: UserRegister):
         raise HTTPException(status_code=400, detail="Invalid role")
 
     try:
+        cur.execute(f"SELECT setval(pg_get_serial_sequence( {table}, 'id'), COALESCE(MAX(id), 1), true);
+")
         cur.execute(
             f"INSERT INTO {table} (username, email, password) VALUES (%s, %s, %s) RETURNING id",
             (user.username, user.email, hashed_password)
         )
+       
         user_id = cur.fetchone()[0]
         conn.commit()
     except Exception as e:
