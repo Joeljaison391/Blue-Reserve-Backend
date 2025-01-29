@@ -15,14 +15,27 @@ services:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - blu_network
-    healthcheck:  # ✅ Add health check
+    healthcheck:  # ✅ Ensure DB is ready before other services
       test: ["CMD-SHELL", "pg_isready -U postgres -d blu_reserve"]
       interval: 5s
       timeout: 3s
       retries: 10
 
-
-
+  db_init:
+    build:
+      context: ./scripts
+    container_name: db_initializer
+    depends_on:
+      db:
+        condition: service_healthy  # Ensure DB is healthy before running init
+    environment:
+      DB_HOST: db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: blu_reserve
+    networks:
+      - blu_network
+    restart: "no"  # Run once and exit
 
   auth_service:
     build:
@@ -36,7 +49,10 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
     networks:
       - blu_network
 
@@ -52,7 +68,10 @@ services:
     ports:
       - "8001:8001"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
     networks:
       - blu_network
 
@@ -80,26 +99,14 @@ services:
     ports:
       - "8003:8003"
     depends_on:
-      - db
-      - auth_service
-      - user_management_service
-
-  db_init:
-    build:
-      context: ./scripts
-    container_name: db_initializer
-    depends_on:
       db:
-        condition: service_healthy  # Ensure DB is healthy before running
-    environment:
-      DB_HOST: db
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: blu_reserve
+        condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
+      auth_service:
+      user_management_service:
     networks:
       - blu_network
-    restart: "no"  # Run once and exit
-
 
   seat_service:
     build:
@@ -113,9 +120,12 @@ services:
     ports:
       - "8004:8004"
     depends_on:
-      - db
-      - auth_service
-      - user_management_service
+      db:
+        condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
+      auth_service:
+      user_management_service:
     networks:
       - blu_network
 
